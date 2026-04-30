@@ -1,0 +1,4 @@
+1. Abrir o terminal integrado, no app.py
+
+2. Colar:
+streamlit run app.py
