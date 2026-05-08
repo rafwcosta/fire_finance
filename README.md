@@ -1,77 +1,66 @@
-# 💰 Gestão Financeira Pessoal
+# 💰 Gestor Financeiro Pessoal
 
-Aplicativo completo de controle financeiro pessoal desenvolvido em **Python + Streamlit**.
+App mobile de gestão financeira pessoal, com deploy automático no GitHub Pages.
 
----
+## 🚀 Como colocar no ar (GitHub Pages)
 
-## 📦 Instalação
-
-### 1. Pré-requisitos
-- Python 3.10 ou superior instalado
-- Terminal (Prompt de Comando, PowerShell ou terminal do VS Code)
-
-### 2. Instalar as dependências
-Abra o terminal na pasta do projeto e execute:
+### 1. Suba o projeto para o GitHub
 
 ```bash
-pip install -r requirements.txt
+git init
+git add .
+git commit -m "feat: gestor financeiro pessoal"
+git branch -M main
+git remote add origin https://github.com/SEU_USUARIO/gestor-financeiro.git
+git push -u origin main
 ```
 
-### 3. Rodar o aplicativo
+### 2. Configure o nome do repositório no Vite
+
+Abra o arquivo `vite.config.js` e troque `gestor-financeiro` pelo nome exato do seu repositório:
+
+```js
+base: '/nome-do-seu-repositorio/',
+```
+
+### 3. Ative o GitHub Pages
+
+- Vá em **Settings → Pages** no seu repositório
+- Em **Source**, selecione **GitHub Actions**
+- Salve
+
+### 4. Aguarde o deploy
+
+Ao fazer `git push`, o GitHub Actions vai automaticamente fazer o build e publicar.
+Acesse: `https://SEU_USUARIO.github.io/gestor-financeiro/`
+
+---
+
+## 🖥️ Rodar localmente
+
 ```bash
-streamlit run app.py
+npm install
+npm run dev
 ```
 
-O app abrirá automaticamente no navegador em `http://localhost:8501`
+## 📦 Build manual
+
+```bash
+npm run build
+```
 
 ---
 
-## 🗂️ Seções do Aplicativo
+## 🗂️ Funcionalidades
 
-| # | Seção | Descrição |
-|---|-------|-----------|
-| 1 | **📋 Lançamentos** | Gastos por tipo: Fixos, Crédito, Pix, Débito, Boleto |
-| 2 | **📈 Investimentos** | Aportes mensais em cada investimento |
-| 3 | **💵 A Receber** | Valores que ainda serão recebidos |
-| 4 | **💸 A Pagar** | Compromissos financeiros pendentes |
-| 5 | **🔮 Projeções** | Receitas, saldo e saúde financeira (Regra 50/30/20) |
-| 6 | **📊 Renda Anual** | Histórico de receitas e gastos por mês |
-| 7 | **📝 Resumo** | Limite, disponível, reserva, datas e geração de PDF |
+- **Resumo** — saldo disponível, barra de limite, datas de pagamento e histórico mensal
+- **Lançamentos** — gastos por categoria (Fixo, Crédito, Pix, Débito, Boleto, Vale Alim.) com edição inline
+- **Saúde Financeira** — regra 30/40/30 aplicada sobre sua renda real
+- **Pagar e Receber** — controle de dívidas e valores a receber com status
+- **Investimentos** — reservas e metas com status de conclusão
+- **Projeções** — receitas vs. saídas e saldo projetado
 
----
+## 💾 Dados
 
-## 💡 Como usar
-
-1. **Selecione o mês** na barra lateral (Ano + Mês)
-2. **Registre seus gastos** na aba Lançamentos, separados por tipo
-3. **Adicione suas receitas** na aba Projeções
-4. **Configure o resumo** com limite de gastos e saldo da reserva
-5. **Marque como Pago** na aba Resumo quando a fatura for quitada
-6. **Gere o relatório PDF** — disponível apenas após marcar como Pago
-
----
-
-## 💾 Armazenamento de dados
-
-Os dados são salvos automaticamente em arquivos JSON dentro da pasta `dados_financeiros/`, 
-um arquivo por mês (ex: `2026-04.json`). Não é necessário banco de dados.
-
----
-
-## 📄 Relatório PDF
-
-O relatório inclui todas as 7 seções com:
-- Todos os lançamentos por categoria com subtotais
-- Análise de saúde financeira (Regra 50/30/20)
-- Projeção de reserva para 1 ano
-- Comparativo da renda anual
-- Resumo completo com datas e médias
-
----
-
-## 🛠️ Tecnologias
-
-- **[Streamlit](https://streamlit.io/)** — Interface web interativa
-- **[Pandas](https://pandas.pydata.org/)** — Manipulação de dados em tabelas
-- **[FPDF2](https://py-pdf.github.io/fpdf2/)** — Geração de relatórios PDF
-- **JSON** — Persistência de dados local
+Os dados ficam salvos automaticamente no `localStorage` do navegador.
+Use o botão **R** (canto superior direito) para exportar/importar backups em JSON.
