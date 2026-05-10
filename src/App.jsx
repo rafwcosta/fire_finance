@@ -7,8 +7,7 @@ const fmt = (v) =>
 const parseBRL = (s) =>
   parseFloat(String(s).replace(/[R$\s.]/g, '').replace(',', '.')) || 0
 
-const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
-               'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
+const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho', 'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
 
 // ─── Dados iniciais ───────────────────────────────────────────────────────────
 const INITIAL = {
@@ -92,11 +91,8 @@ const Ico = {
 // ─── Estilos globais ──────────────────────────────────────────────────────────
 const G = {
   card:  { background:'#1a1f2e', borderRadius:16, border:'1px solid #252b3b', padding:'18px 20px', marginBottom:14 },
-  input: { width:'100%', background:'#0f1420', border:'1px solid #2a3048', borderRadius:10,
-           color:'#fff', padding:'11px 14px', fontSize:15, outline:'none',
-           boxSizing:'border-box', fontFamily:'inherit' },
-  label: { color:'#8892a4', fontSize:12, display:'block', marginBottom:6,
-           textTransform:'uppercase', letterSpacing:1 },
+  input: { width:'100%', background:'#0f1420', border:'1px solid #2a3048', borderRadius:10, color:'#fff', padding:'11px 14px', fontSize:15, outline:'none', boxSizing:'border-box', fontFamily:'inherit' },
+  label: { color:'#8892a4', fontSize:12, display:'block', marginBottom:6, textTransform:'uppercase', letterSpacing:1 },
   btn:   (bg) => ({ width:'100%', background:bg, border:'none', borderRadius:12,
                     color:'#fff', padding:'14px', fontSize:15, fontWeight:700, cursor:'pointer' }),
 }
@@ -128,7 +124,7 @@ function Sheet({ title, onClose, children }) {
   return (
     <div style={{ position:'fixed', inset:0, zIndex:200, background:'rgba(0,0,0,0.75)',
                   display:'flex', alignItems:'flex-end', justifyContent:'center' }}
-         onClick={(e) => e.target === e.currentTarget && onClose()}>
+                  onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div style={{ background:'#1a1f2e', borderRadius:'20px 20px 0 0',
                     width:'100%', maxWidth:430, padding:'24px 20px 40px',
                     animation:'slideUp .25s ease', maxHeight:'90vh', overflowY:'auto' }}>
@@ -158,8 +154,7 @@ function FAB({ color, onClick }) {
 
 function Tag({ children, color }) {
   return (
-    <span style={{ background:color+'22', color, borderRadius:99,
-                   padding:'2px 10px', fontSize:11, fontWeight:700 }}>
+    <span style={{ background:color+'22', color, borderRadius:99, padding:'2px 10px', fontSize:11, fontWeight:700 }}>
       {children}
     </span>
   )
@@ -204,8 +199,7 @@ function TelaResumo({ data, setData }) {
           ))}
         </div>
         <button onClick={() => { setForm({ ...atual }); setEditResumo(true) }}
-          style={{ position:'absolute', top:16, right:16, background:'rgba(255,255,255,.08)',
-                   border:'none', borderRadius:8, color:'#aaa', padding:8, cursor:'pointer', display:'flex' }}>
+          style={{ position:'absolute', top:16, right:16, background:'rgba(255,255,255,.08)', border:'none', borderRadius:8, color:'#aaa', padding:8, cursor:'pointer', display:'flex' }}>
           <Ico.Edit />
         </button>
       </div>
@@ -343,8 +337,7 @@ function TelaLancamentos({ data, setData }) {
               <span style={{ color:'#cdd5e0', fontSize:14 }}>{item.nome}</span>
             </div>
             <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-              <span style={{ color: item.valor<0?'#ef4444': item.valor===0?'#4b5563':catInfo.color,
-                             fontSize:14, fontWeight:700 }}>{fmt(item.valor)}</span>
+              <span style={{ color: item.valor<0?'#ef4444': item.valor===0?'#4b5563':catInfo.color, fontSize:14, fontWeight:700 }}>{fmt(item.valor)}</span>
               <button onClick={() => abrirEdit(i)}
                 style={{ background:'none', border:'none', cursor:'pointer', color:'#8892a4', padding:4, display:'flex' }}>
                 <Ico.Edit />
@@ -725,9 +718,7 @@ export default function App() {
             </h1>
           </div>
           <button onClick={() => setMenuBackup(true)}
-            style={{ background:'#10b981', borderRadius:'50%', width:38, height:38, border:'none',
-                     display:'flex', alignItems:'center', justifyContent:'center',
-                     color:'#fff', fontWeight:700, fontSize:15, cursor:'pointer' }}>
+            style={{ background:'#10b981', borderRadius:'50%', width:38, height:38, border:'none', display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontWeight:700, fontSize:15, cursor:'pointer' }}>
             R
           </button>
         </div>
