@@ -4,5 +4,5 @@ import react from '@vitejs/plugin-react'
 // Troque 'gestor-financeiro' pelo nome EXATO do seu repositório no GitHub
 export default defineConfig({
   plugins: [react()],
-  base: '/gestor-financeiro/',
+  base: '/fire_finance/',
 })
