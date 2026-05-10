@@ -1,59 +1,41 @@
 import { useState, useCallback } from 'react'
 import {
-  fmt, parseBRL,
+  fmt, fmtPct, parseBRL,
   calcTotalGastos, calcTotalReceitas, calcDisponivel,
   calcSaldoReserva, calcPercentualLimite, corLimite,
-  calcSaude, calcTotalContas, calcTotalPorStatus,
+  calcSaude, calcProjecaoReserva1Ano,
+  calcTotalContas, calcTotalPorStatus,
   calcTotalInvestimentos, calcInvestimentosConcluidos,
   calcMediaGastosAnual, totalCategoria,
 } from './utils/calculos'
 
-// ─── Dados iniciais ───────────────────────────────────────────────────────────
+// ─── Dados iniciais GENÉRICOS (sem dados pessoais) ────────────────────────────
 const INITIAL = {
   lancamentos: {
-    fixo:    [{ nome:'Internet', valor:30 },{ nome:'Academia', valor:149.9 },
-              { nome:'Cabelo', valor:30 },{ nome:'Seguro', valor:81.94 },
-              { nome:'Gasolina', valor:0 },{ nome:'Spotify', valor:12.9 },
-              { nome:'Streaming', valor:0 },{ nome:'Conta de luz', valor:95 }],
-    credito: [{ nome:'Fatura', valor:1113.57 },{ nome:'Internet', valor:-30 },
-              { nome:'Academia', valor:-149.9 },{ nome:'Streaming', valor:0 },
-              { nome:'Seguro', valor:0 },{ nome:'Gasolina', valor:0 },
-              { nome:'Spotify', valor:-12.9 }],
-    pix:     [{ nome:'Gas. Carro', valor:14 },{ nome:'99', valor:4.8 },{ nome:'99', valor:8.91 }],
-    debito:  [{ nome:'Coca', valor:12.5 },{ nome:'Ifood', valor:22.89 },
-              { nome:'Não sei', valor:11.5 },{ nome:'Almoço', valor:17 }],
+    fixo:    [],
+    credito: [],
+    pix:     [],
+    debito:  [],
     boleto:  [],
     valeAlim:[],
   },
   pagarReceber: {
     pagar:   [],
-    receber: [{ nome:'Su', valor:558, motivo:'Vale alimentação', status:'Pendente' }],
+    receber: [],
   },
-  investimentos: [
-    { tipo:'Reserva de emergência', valor:500, status:'Pendente' },
-    { tipo:'Revisão da moto', valor:85, status:'Pendente' },
-  ],
+  investimentos: [],
   projecoes: {
-    receitas: [
-      { nome:'Salário líquido', valor:1768.79 },
-      { nome:'Vale transporte', valor:180 },
-      { nome:'Vale alimentação', valor:558 },
-      { nome:'Motorista de aplicativo', valor:0 },
-    ],
+    receitas: [],
   },
   config: {
-    mes: 'Junho',
-    limite: 2400,
-    fechamento: '04/06/2026',
-    vencimento: '11/06/2026',
-    dataPagamento: '05/06/2026',
+    mes: new Date().toLocaleString('pt-BR', { month: 'long' }).replace(/^\w/, c => c.toUpperCase()),
+    limite: 0,
+    fechamento: '',
+    vencimento: '',
+    dataPagamento: '',
     status: 'Em aberto',
   },
-  historico: [
-    { mes:'Janeiro', valor:2255.02 },{ mes:'Fevereiro', valor:2435.74 },
-    { mes:'Março', valor:2765.10 },{ mes:'Abril', valor:2395.68 },
-    { mes:'Maio', valor:2440.15 },
-  ],
+  historico: [],
 }
 
 // ─── Hook localStorage ────────────────────────────────────────────────────────
@@ -83,26 +65,29 @@ const Ico = {
   Trash:  () => <svg viewBox="0 0 24 24" fill="currentColor" width="17" height="17"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>,
   Edit:   () => <svg viewBox="0 0 24 24" fill="currentColor" width="17" height="17"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>,
   Close:  () => <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>,
-  Down:   () => <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>,
-  Up:     () => <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg>,
+  Down:   () => <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>,
+  Up:     () => <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg>,
+  Settings:() => <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>,
 }
 
 // ─── Estilos base ─────────────────────────────────────────────────────────────
 const G = {
   card:  { background:'#1a1f2e', borderRadius:16, border:'1px solid #252b3b', padding:'18px 20px', marginBottom:14 },
-  input: { width:'100%', background:'#0f1420', border:'1px solid #2a3048', borderRadius:10,  color:'#fff', padding:'11px 14px', fontSize:15, outline:'none', boxSizing:'border-box', fontFamily:'inherit' },
-  label: { color:'#8892a4', fontSize:12, display:'block', marginBottom:6, textTransform:'uppercase', letterSpacing:1 },
+  input: { width:'100%', background:'#0f1420', border:'1px solid #2a3048', borderRadius:10,
+           color:'#fff', padding:'11px 14px', fontSize:15, outline:'none',
+           boxSizing:'border-box', fontFamily:'inherit' },
+  label: { color:'#8892a4', fontSize:12, display:'block', marginBottom:6,
+           textTransform:'uppercase', letterSpacing:1 },
   btn:   (bg) => ({ width:'100%', background:bg, border:'none', borderRadius:12,
                     color:'#fff', padding:'14px', fontSize:15, fontWeight:700, cursor:'pointer' }),
 }
 
 // ─── Componentes base ─────────────────────────────────────────────────────────
-function Field({ label, value, onChange, type='text', placeholder }) {
+function Field({ label, value, onChange, placeholder }) {
   return (
     <div style={{ marginBottom:14 }}>
       <label style={G.label}>{label}</label>
-      <input type={type} value={value} onChange={onChange}
-        placeholder={placeholder} style={G.input} />
+      <input value={value} onChange={onChange} placeholder={placeholder} style={G.input} />
     </div>
   )
 }
@@ -122,10 +107,10 @@ function Sheet({ title, onClose, children }) {
   return (
     <div style={{ position:'fixed', inset:0, zIndex:200, background:'rgba(0,0,0,0.75)',
                   display:'flex', alignItems:'flex-end', justifyContent:'center' }}
-                  onClick={e => e.target === e.currentTarget && onClose()}>
+         onClick={e => e.target === e.currentTarget && onClose()}>
       <div style={{ background:'#1a1f2e', borderRadius:'20px 20px 0 0', width:'100%',
                     maxWidth:430, padding:'24px 20px 40px', animation:'slideUp .25s ease',
-                    maxHeight:'90vh', overflowY:'auto' }}>
+                    maxHeight:'92vh', overflowY:'auto' }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
           <span style={{ color:'#fff', fontSize:18, fontWeight:700 }}>{title}</span>
           <button onClick={onClose} style={{ background:'#252b3b', border:'none', borderRadius:8,
@@ -145,7 +130,7 @@ function FAB({ color, onClick }) {
       position:'fixed', bottom:90, right:'calc(50% - 200px)',
       background:color, border:'none', borderRadius:'50%',
       width:54, height:54, display:'flex', alignItems:'center', justifyContent:'center',
-      cursor:'pointer', boxShadow:`0 4px 20px ${color}70`, color:'#fff', zIndex:50
+      cursor:'pointer', boxShadow:`0 4px 20px ${color}70`, color:'#fff', zIndex:50,
     }}><Ico.Plus /></button>
   )
 }
@@ -158,11 +143,10 @@ function Tag({ children, color }) {
   )
 }
 
-function MiniStat({ label, valor, cor }) {
+function Vazio({ msg }) {
   return (
-    <div>
-      <p style={{ color:'#6b7280', fontSize:10, margin:'0 0 2px', textTransform:'uppercase' }}>{label}</p>
-      <p style={{ color:cor, fontSize:15, fontWeight:700, margin:0 }}>{fmt(valor)}</p>
+    <div style={{ textAlign:'center', padding:'40px 20px' }}>
+      <p style={{ color:'#4b5563', fontSize:14, margin:0 }}>➕ {msg}</p>
     </div>
   )
 }
@@ -171,14 +155,14 @@ function MiniStat({ label, valor, cor }) {
 function TelaResumo({ data, setData }) {
   const { config, historico, lancamentos, projecoes, investimentos } = data
 
-  // ✅ Todos calculados automaticamente
-  const totalReceitas  = calcTotalReceitas(projecoes.receitas)
-  const totalGastos    = calcTotalGastos(lancamentos)
-  const disponivel     = calcDisponivel(totalReceitas, totalGastos)
-  const saldoReserva   = calcSaldoReserva(investimentos)
-  const pct            = calcPercentualLimite(totalGastos, config.limite)
-  const barColor       = corLimite(pct)
-  const mediaAnual     = calcMediaGastosAnual(historico)
+  // ✅ Todos calculados automaticamente a partir dos lançamentos e receitas
+  const totalReceitas = calcTotalReceitas(projecoes.receitas)
+  const totalGastos   = calcTotalGastos(lancamentos)
+  const disponivel    = calcDisponivel(totalReceitas, totalGastos)
+  const saldoReserva  = calcSaldoReserva(investimentos)
+  const pct           = calcPercentualLimite(totalGastos, config.limite)
+  const barColor      = corLimite(pct)
+  const mediaAnual    = calcMediaGastosAnual(historico)
 
   const [editando, setEditando] = useState(false)
   const [form, setForm] = useState({ ...config })
@@ -188,8 +172,34 @@ function TelaResumo({ data, setData }) {
     setEditando(false)
   }
 
+  // Modal para adicionar mês ao histórico
+  const [modalHist, setModalHist] = useState(false)
+  const [formHist, setFormHist] = useState({ mes:'', valor:'' })
+
+  const adicionarHistorico = () => {
+    if (!formHist.mes) return
+    const novo = { mes: formHist.mes, valor: parseBRL(formHist.valor) }
+    setData({ ...data, historico: [...historico, novo] })
+    setFormHist({ mes:'', valor:'' }); setModalHist(false)
+  }
+
+  const removerHistorico = (i) => {
+    setData({ ...data, historico: historico.filter((_,idx) => idx !== i) })
+  }
+
+  const semDados = totalReceitas === 0 && totalGastos === 0
+
   return (
     <div style={{ padding:'0 16px 16px' }}>
+      {semDados && (
+        <div style={{ background:'#1c1500', borderRadius:14, padding:'14px 18px', marginBottom:16,
+                      border:'1px solid #f59e0b40' }}>
+          <p style={{ color:'#f59e0b', fontSize:13, margin:0, lineHeight:1.6 }}>
+            👋 Bem-vindo! Comece adicionando suas <strong>receitas</strong> na aba Projeção e seus <strong>lançamentos</strong> na aba Gastos.
+          </p>
+        </div>
+      )}
+
       {/* Card principal */}
       <div style={{ background:'linear-gradient(135deg,#0f3460,#16213e)', borderRadius:20,
                     padding:'28px 24px', marginBottom:16, border:'1px solid #1e3a5f', position:'relative' }}>
@@ -201,79 +211,107 @@ function TelaResumo({ data, setData }) {
         <p style={{ color: disponivel >= 0 ? '#10b981' : '#ef4444', fontSize:38, fontWeight:700, margin:'0 0 4px' }}>
           {fmt(disponivel)}
         </p>
-        <p style={{ color: config.status==='Em aberto' ? '#f59e0b':'#10b981', fontSize:13, margin:0 }}>
+        <p style={{ color: config.status === 'Em aberto' ? '#f59e0b' : '#10b981', fontSize:13, margin:0 }}>
           {config.status}
         </p>
         <div style={{ marginTop:20, display:'flex', gap:20 }}>
-          <MiniStat label="Receitas"  valor={totalReceitas} cor="#10b981" />
-          <MiniStat label="Gastos"    valor={totalGastos}   cor="#f59e0b" />
-          <MiniStat label="Reserva"   valor={saldoReserva}  cor="#60a5fa" />
+          {[['Receitas',totalReceitas,'#10b981'],['Gastos',totalGastos,'#f59e0b'],['Reserva',saldoReserva,'#60a5fa']].map(([l,v,c]) => (
+            <div key={l}>
+              <p style={{ color:'#6b7280', fontSize:10, margin:'0 0 2px', textTransform:'uppercase' }}>{l}</p>
+              <p style={{ color:c, fontSize:15, fontWeight:700, margin:0 }}>{fmt(v)}</p>
+            </div>
+          ))}
         </div>
         <button onClick={() => { setForm({ ...config }); setEditando(true) }}
-          style={{ position:'absolute', top:16, right:16, background:'rgba(255,255,255,.08)', border:'none', borderRadius:8, color:'#aaa', padding:8, cursor:'pointer', display:'flex' }}>
-          <Ico.Edit />
+          style={{ position:'absolute', top:16, right:16, background:'rgba(255,255,255,.08)',
+                   border:'none', borderRadius:8, color:'#aaa', padding:8, cursor:'pointer', display:'flex' }}>
+          <Ico.Settings />
         </button>
       </div>
 
       {/* Barra de limite */}
-      <div style={G.card}>
-        <div style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
-          <span style={{ color:'#cdd5e0', fontSize:14, fontWeight:600 }}>Limite do mês</span>
-          <span style={{ color:'#8892a4', fontSize:13 }}>{fmt(totalGastos)} / {fmt(config.limite)}</span>
+      {config.limite > 0 && (
+        <div style={G.card}>
+          <div style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
+            <span style={{ color:'#cdd5e0', fontSize:14, fontWeight:600 }}>Limite do mês</span>
+            <span style={{ color:'#8892a4', fontSize:13 }}>{fmt(totalGastos)} / {fmt(config.limite)}</span>
+          </div>
+          <div style={{ background:'#0f1420', borderRadius:99, height:8 }}>
+            <div style={{ width:`${pct}%`, height:'100%', borderRadius:99, background:barColor, transition:'width .5s' }} />
+          </div>
+          <p style={{ color:'#6b7280', fontSize:12, margin:'6px 0 0' }}>
+            {(100 - pct).toFixed(0)}% do limite disponível
+            {mediaAnual > 0 && ` · Média mensal: ${fmt(mediaAnual)}`}
+          </p>
         </div>
-        <div style={{ background:'#0f1420', borderRadius:99, height:8 }}>
-          <div style={{ width:`${pct}%`, height:'100%', borderRadius:99, background:barColor, transition:'width .5s' }} />
-        </div>
-        <p style={{ color:'#6b7280', fontSize:12, margin:'6px 0 0' }}>
-          {(100 - pct).toFixed(0)}% do limite disponível · Média mensal: {fmt(mediaAnual)}
-        </p>
-      </div>
+      )}
 
       {/* Datas */}
-      <div style={G.card}>
-        <p style={{ color:'#cdd5e0', fontSize:14, fontWeight:600, margin:'0 0 12px' }}>📅 Pagamento</p>
-        {[['Fechamento',config.fechamento],['Vencimento',config.vencimento],['Data do pagamento',config.dataPagamento]].map(([l,v]) => (
-          <div key={l} style={{ display:'flex', justifyContent:'space-between', marginBottom:7 }}>
-            <span style={{ color:'#8892a4', fontSize:13 }}>{l}</span>
-            <span style={{ color:'#60a5fa', fontSize:13, fontWeight:600 }}>{v}</span>
-          </div>
-        ))}
-      </div>
+      {(config.fechamento || config.vencimento) && (
+        <div style={G.card}>
+          <p style={{ color:'#cdd5e0', fontSize:14, fontWeight:600, margin:'0 0 12px' }}>📅 Pagamento</p>
+          {[['Fechamento',config.fechamento],['Vencimento',config.vencimento],['Data do pagamento',config.dataPagamento]].filter(([,v]) => v).map(([l,v]) => (
+            <div key={l} style={{ display:'flex', justifyContent:'space-between', marginBottom:7 }}>
+              <span style={{ color:'#8892a4', fontSize:13 }}>{l}</span>
+              <span style={{ color:'#60a5fa', fontSize:13, fontWeight:600 }}>{v}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Histórico */}
       <div style={G.card}>
-        <p style={{ color:'#cdd5e0', fontSize:14, fontWeight:600, margin:'0 0 14px' }}>📊 Histórico de gastos</p>
-        {historico.map(h => {
-          const w = Math.min((h.valor / 3200) * 100, 100)
-          return (
-            <div key={h.mes} style={{ marginBottom:10 }}>
-              <div style={{ display:'flex', justifyContent:'space-between', marginBottom:3 }}>
-                <span style={{ color:'#8892a4', fontSize:12 }}>{h.mes}</span>
-                <span style={{ color:'#cdd5e0', fontSize:12, fontWeight:600 }}>{fmt(h.valor)}</span>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
+          <p style={{ color:'#cdd5e0', fontSize:14, fontWeight:600, margin:0 }}>📊 Histórico de gastos</p>
+          <button onClick={() => setModalHist(true)} style={{ background:'#252b3b', border:'none',
+            borderRadius:8, color:'#10b981', padding:'5px 10px', cursor:'pointer', fontSize:12, fontWeight:700 }}>
+            + Mês
+          </button>
+        </div>
+        {historico.length === 0
+          ? <p style={{ color:'#4b5563', fontSize:13 }}>Adicione meses anteriores para ver o histórico</p>
+          : historico.map((h, i) => {
+            const max = Math.max(...historico.map(x => x.valor), 1)
+            return (
+              <div key={i} style={{ marginBottom:10 }}>
+                <div style={{ display:'flex', justifyContent:'space-between', marginBottom:3 }}>
+                  <span style={{ color:'#8892a4', fontSize:12 }}>{h.mes}</span>
+                  <div style={{ display:'flex', gap:10, alignItems:'center' }}>
+                    <span style={{ color:'#cdd5e0', fontSize:12, fontWeight:600 }}>{fmt(h.valor)}</span>
+                    <button onClick={() => removerHistorico(i)} style={{ background:'none', border:'none',
+                      cursor:'pointer', color:'#4b5563', padding:0, display:'flex' }}><Ico.Trash /></button>
+                  </div>
+                </div>
+                <div style={{ background:'#0f1420', borderRadius:99, height:5 }}>
+                  <div style={{ width:`${(h.valor/max)*100}%`, height:'100%', borderRadius:99, background:'#3b82f6' }} />
+                </div>
               </div>
-              <div style={{ background:'#0f1420', borderRadius:99, height:5 }}>
-                <div style={{ width:`${w}%`, height:'100%', borderRadius:99, background:'#3b82f6' }} />
-              </div>
-            </div>
-          )
-        })}
+            )
+          })
+        }
       </div>
 
-      {/* Modal de configuração */}
+      {/* Modais */}
       {editando && (
-        <Sheet title="Configurações do mês" onClose={() => setEditando(false)}>
+        <Sheet title="⚙️ Configurações do mês" onClose={() => setEditando(false)}>
           <p style={{ color:'#6b7280', fontSize:13, margin:'0 0 18px', lineHeight:1.6 }}>
-            Apenas as configurações do mês precisam de entrada manual. Todos os valores financeiros são calculados automaticamente.
+            Saldo, gastos e reserva são calculados automaticamente. Configure apenas o mês e as datas.
           </p>
-          <Field label="Mês atual" value={form.mes} onChange={e => setForm({ ...form, mes:e.target.value })} />
-          <Field label="Limite mensal (R$)" value={String(form.limite)} onChange={e => setForm({ ...form, limite:e.target.value })} />
+          <Field label="Mês atual" value={form.mes} onChange={e => setForm({ ...form, mes:e.target.value })} placeholder="Ex: Junho" />
+          <Field label="Limite de gastos (R$)" value={String(form.limite)} onChange={e => setForm({ ...form, limite:e.target.value })} placeholder="0,00" />
           <Field label="Fechamento" value={form.fechamento} onChange={e => setForm({ ...form, fechamento:e.target.value })} placeholder="DD/MM/AAAA" />
           <Field label="Vencimento" value={form.vencimento} onChange={e => setForm({ ...form, vencimento:e.target.value })} placeholder="DD/MM/AAAA" />
           <Field label="Data do pagamento" value={form.dataPagamento} onChange={e => setForm({ ...form, dataPagamento:e.target.value })} placeholder="DD/MM/AAAA" />
-          <Sel label="Status" value={form.status}
-            onChange={e => setForm({ ...form, status:e.target.value })}
+          <Sel label="Status" value={form.status} onChange={e => setForm({ ...form, status:e.target.value })}
             options={['Em aberto','Pago','Parcial']} />
-          <button onClick={salvarConfig} style={G.btn('#3b82f6')}>Salvar configurações</button>
+          <button onClick={salvarConfig} style={G.btn('#3b82f6')}>Salvar</button>
+        </Sheet>
+      )}
+      {modalHist && (
+        <Sheet title="Adicionar ao histórico" onClose={() => setModalHist(false)}>
+          <Field label="Mês" value={formHist.mes} onChange={e => setFormHist({ ...formHist, mes:e.target.value })} placeholder="Ex: Janeiro" />
+          <Field label="Total gasto (R$)" value={formHist.valor} onChange={e => setFormHist({ ...formHist, valor:e.target.value })} placeholder="0,00" />
+          <button onClick={adicionarHistorico} style={G.btn('#3b82f6')}>Adicionar</button>
         </Sheet>
       )}
     </div>
@@ -282,12 +320,12 @@ function TelaResumo({ data, setData }) {
 
 // ─── Tela Lançamentos ─────────────────────────────────────────────────────────
 const CATS = [
-  { key:'fixo',    label:'Fixo',       color:'#10b981', emoji:'🔒' },
-  { key:'credito', label:'Crédito',    color:'#f59e0b', emoji:'💳' },
-  { key:'pix',     label:'Pix',        color:'#8b5cf6', emoji:'📱' },
-  { key:'debito',  label:'Débito',     color:'#ef4444', emoji:'🏧' },
-  { key:'boleto',  label:'Boleto',     color:'#6b7280', emoji:'📄' },
-  { key:'valeAlim',label:'Vale Alim.', color:'#f97316', emoji:'🍽️' },
+  { key:'fixo',    label:'Fixo',       color:'#10b981', emoji:'🔒', desc:'Internet, aluguel, assinaturas' },
+  { key:'credito', label:'Crédito',    color:'#f59e0b', emoji:'💳', desc:'Fatura e compras no crédito' },
+  { key:'pix',     label:'Pix',        color:'#8b5cf6', emoji:'📱', desc:'Transferências e pagamentos via Pix' },
+  { key:'debito',  label:'Débito',     color:'#ef4444', emoji:'🏧', desc:'Compras no débito' },
+  { key:'boleto',  label:'Boleto',     color:'#6b7280', emoji:'📄', desc:'Boletos e carnês' },
+  { key:'valeAlim',label:'Vale Alim.', color:'#f97316', emoji:'🍽️', desc:'Gastos com vale alimentação' },
 ]
 
 function TelaLancamentos({ data, setData }) {
@@ -296,8 +334,6 @@ function TelaLancamentos({ data, setData }) {
   const [form, setForm] = useState({ nome:'', valor:'' })
   const catInfo = CATS.find(c => c.key === cat)
   const itens = data.lancamentos[cat] || []
-
-  // ✅ Calculado automaticamente
   const total = totalCategoria(itens)
 
   const abrirAdd  = () => { setForm({ nome:'', valor:'' }); setModal('add') }
@@ -306,7 +342,7 @@ function TelaLancamentos({ data, setData }) {
   const salvar = () => {
     if (!form.nome) return
     const u = { ...data }
-    const novo = { nome:form.nome, valor:parseBRL(form.valor) }
+    const novo = { nome: form.nome, valor: parseBRL(form.valor) }
     if (modal === 'add') u.lancamentos[cat] = [...itens, novo]
     else { const arr = [...itens]; arr[modal] = novo; u.lancamentos[cat] = arr }
     setData(u); setModal(null)
@@ -324,10 +360,10 @@ function TelaLancamentos({ data, setData }) {
         {CATS.map(c => (
           <button key={c.key} onClick={() => setCat(c.key)} style={{
             background: cat===c.key ? c.color : '#1a1f2e',
-            border:`1px solid ${cat===c.key ? c.color : '#252b3b'}`,
+            border: `1px solid ${cat===c.key ? c.color : '#252b3b'}`,
             borderRadius:99, color: cat===c.key ? '#fff' : '#8892a4',
             padding:'7px 14px', fontSize:12, fontWeight:600,
-            whiteSpace:'nowrap', cursor:'pointer', flexShrink:0
+            whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
           }}>{c.emoji} {c.label}</button>
         ))}
       </div>
@@ -337,14 +373,12 @@ function TelaLancamentos({ data, setData }) {
         <p style={{ color:'#8892a4', fontSize:11, textTransform:'uppercase', margin:'0 0 4px' }}>
           Total {catInfo.label}
         </p>
-        <p style={{ color:catInfo.color, fontSize:30, fontWeight:700, margin:0 }}>{fmt(total)}</p>
-        <p style={{ color:'#6b7280', fontSize:11, margin:'4px 0 0' }}>
-          {itens.length} {itens.length === 1 ? 'item' : 'itens'} · valores negativos = descontos/estornos
-        </p>
+        <p style={{ color:catInfo.color, fontSize:30, fontWeight:700, margin:'0 0 4px' }}>{fmt(total)}</p>
+        <p style={{ color:'#4b5563', fontSize:11, margin:0 }}>{catInfo.desc}</p>
       </div>
 
       {itens.length === 0
-        ? <p style={{ color:'#4b5563', textAlign:'center', padding:'36px 0' }}>Nenhum lançamento</p>
+        ? <Vazio msg="Toque no botão + para adicionar um lançamento" />
         : itens.map((item, i) => (
           <div key={i} style={{ ...G.card, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
             <div style={{ display:'flex', alignItems:'center', gap:12, flex:1 }}>
@@ -353,7 +387,8 @@ function TelaLancamentos({ data, setData }) {
               <span style={{ color:'#cdd5e0', fontSize:14 }}>{item.nome}</span>
             </div>
             <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-              <span style={{ color: item.valor<0?'#ef4444':item.valor===0?'#4b5563':catInfo.color, fontSize:14, fontWeight:700 }}>{fmt(item.valor)}</span>
+              <span style={{ color: item.valor < 0 ? '#ef4444' : item.valor === 0 ? '#4b5563' : catInfo.color,
+                             fontSize:14, fontWeight:700 }}>{fmt(item.valor)}</span>
               <button onClick={() => abrirEdit(i)} style={{ background:'none', border:'none', cursor:'pointer', color:'#8892a4', padding:4, display:'flex' }}><Ico.Edit /></button>
               <button onClick={() => remover(i)} style={{ background:'none', border:'none', cursor:'pointer', color:'#4b5563', padding:4, display:'flex' }}><Ico.Trash /></button>
             </div>
@@ -364,12 +399,12 @@ function TelaLancamentos({ data, setData }) {
       <FAB color={catInfo.color} onClick={abrirAdd} />
 
       {modal !== null && (
-        <Sheet title={modal==='add' ? `Adicionar em ${catInfo.label}` : 'Editar lançamento'} onClose={() => setModal(null)}>
-          <Field label="Nome" value={form.nome} onChange={e => setForm({ ...form, nome:e.target.value })} placeholder="Ex: Mercado" />
-          <Field label="Valor (use - para desconto/estorno)" value={form.valor}
+        <Sheet title={modal === 'add' ? `Adicionar em ${catInfo.label}` : 'Editar lançamento'} onClose={() => setModal(null)}>
+          <Field label="Nome" value={form.nome} onChange={e => setForm({ ...form, nome:e.target.value })} placeholder="Ex: Netflix, Mercado, Conta de luz..." />
+          <Field label="Valor (R$) — use - para estorno/desconto" value={form.valor}
             onChange={e => setForm({ ...form, valor:e.target.value })} placeholder="0,00" />
           <button onClick={salvar} style={G.btn(catInfo.color)}>
-            {modal==='add' ? 'Adicionar' : 'Salvar alterações'}
+            {modal === 'add' ? 'Adicionar' : 'Salvar alterações'}
           </button>
         </Sheet>
       )}
@@ -378,52 +413,90 @@ function TelaLancamentos({ data, setData }) {
 }
 
 // ─── Tela Saúde Financeira ────────────────────────────────────────────────────
+// Fórmulas da planilha:
+//   fixos %     = SOMA(fixos) / SOMA(receitas)
+//   variáveis % = SOMA(variáveis) / SOMA(receitas)
+//   poupança %  = (receitas - fixos - variáveis) / receitas
+//   ideal fixos    = 0,3 × receitas
+//   ideal variáveis= 0,4 × receitas
+//   ideal poupança = 0,3 × receitas
+//   projeção 1 ano = VF(0; 12; -(reserva + poupança_mensal); 0)
 function TelaSaude({ data }) {
-  // ✅ Todos calculados automaticamente
   const totalReceitas = calcTotalReceitas(data.projecoes.receitas)
-  const { fixos, variaveis, poupanca } = calcSaude(data.lancamentos, totalReceitas)
+  const { fixos, variaveis, poupanca,
+          pctFixos, pctVariaveis, pctPoupanca,
+          idealFixos, idealVariaveis, idealPoupanca } = calcSaude(data.lancamentos, totalReceitas)
+
+  const reservaAtual = calcSaldoReserva(data.investimentos)
+  const projecao1Ano = calcProjecaoReserva1Ano(reservaAtual, poupanca)
 
   const grupos = [
-    { label:'Gastos Fixos',     perc:30, real:fixos,     color:'#ef4444', desc:'Crédito, contas, assinaturas, seguros' },
-    { label:'Gastos Variáveis', perc:40, real:variaveis, color:'#f59e0b', desc:'Pix, débito, vale alimentação' },
-    { label:'Poupança',         perc:30, real:poupanca,  color:'#10b981', desc:'O que sobra das receitas' },
+    { label:'Gastos Fixos',     perc:30, ideal:idealFixos,    real:fixos,    pct:pctFixos,    color:'#ef4444', desc:'Crédito · Fixo · Boleto' },
+    { label:'Gastos Variáveis', perc:40, ideal:idealVariaveis, real:variaveis, pct:pctVariaveis, color:'#f59e0b', desc:'Pix · Débito · Vale Alimentação' },
+    { label:'Poupança',         perc:30, ideal:idealPoupanca,  real:poupanca,  pct:pctPoupanca,  color:'#10b981', desc:'O que sobra das receitas' },
   ]
+
+  if (totalReceitas === 0) {
+    return (
+      <div style={{ padding:'0 16px 16px' }}>
+        <Vazio msg="Adicione suas receitas na aba Projeção para ver sua saúde financeira" />
+      </div>
+    )
+  }
 
   return (
     <div style={{ padding:'0 16px 16px' }}>
       <div style={G.card}>
-        <p style={{ color:'#8892a4', fontSize:11, textTransform:'uppercase', margin:'0 0 6px' }}>Renda total (receitas)</p>
-        <p style={{ color:'#10b981', fontSize:32, fontWeight:700, margin:0 }}>{fmt(totalReceitas)}</p>
-        <p style={{ color:'#6b7280', fontSize:12, margin:'4px 0 0' }}>Regra 30/40/30 · calculado em tempo real</p>
+        <p style={{ color:'#8892a4', fontSize:11, textTransform:'uppercase', margin:'0 0 6px' }}>Total de receitas</p>
+        <p style={{ color:'#10b981', fontSize:32, fontWeight:700, margin:'0 0 4px' }}>{fmt(totalReceitas)}</p>
+        <p style={{ color:'#6b7280', fontSize:12, margin:0 }}>Regra 30 / 40 / 30 · atualizado em tempo real</p>
       </div>
 
       {grupos.map(g => {
-        const ideal = (totalReceitas * g.perc) / 100
-        const pct = Math.min((g.real / ideal) * 100, 150)
-        const ok = g.real <= ideal
+        const barPct = Math.min((g.real / Math.max(g.ideal, 1)) * 100, 100)
+        const ok = g.real <= g.ideal
         return (
           <div key={g.label} style={{ ...G.card, border:`1px solid ${ok ? '#252b3b' : g.color+'40'}` }}>
-            <div style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:10 }}>
               <div>
                 <p style={{ color:'#cdd5e0', fontSize:14, fontWeight:700, margin:'0 0 2px' }}>{g.label}</p>
-                <p style={{ color:'#6b7280', fontSize:11, margin:0 }}>{g.desc}</p>
+                <p style={{ color:'#4b5563', fontSize:11, margin:0 }}>{g.desc}</p>
               </div>
               <Tag color={ok ? '#10b981' : '#ef4444'}>{ok ? '✓ OK' : '⚠ Alto'}</Tag>
             </div>
             <div style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
-              <span style={{ color:'#8892a4', fontSize:12 }}>Ideal: {fmt(ideal)} ({g.perc}%)</span>
-              <span style={{ color:g.color, fontSize:12, fontWeight:700 }}>Real: {fmt(g.real)}</span>
+              <span style={{ color:'#8892a4', fontSize:12 }}>
+                Ideal: {fmt(g.ideal)} ({g.perc}%) · Real: {fmtPct(g.pct)}
+              </span>
+              <span style={{ color:g.color, fontSize:13, fontWeight:700 }}>{fmt(g.real)}</span>
             </div>
             <div style={{ background:'#0f1420', borderRadius:99, height:7 }}>
-              <div style={{ width:`${Math.min(pct,100)}%`, height:'100%', borderRadius:99,
-                            background: ok ? g.color : '#ef4444' }} />
+              <div style={{ width:`${barPct}%`, height:'100%', borderRadius:99,
+                            background: ok ? g.color : '#ef4444', transition:'width .4s' }} />
             </div>
-            <p style={{ color:'#6b7280', fontSize:11, margin:'6px 0 0' }}>
-              Reserva de emergência ideal: {fmt(ideal * 12)} (12 meses)
-            </p>
           </div>
         )
       })}
+
+      {/* Projeção de reserva — VF(0; 12; -(reserva + poupança); 0) */}
+      <div style={{ ...G.card, border:'1px solid #818cf840' }}>
+        <p style={{ color:'#cdd5e0', fontSize:14, fontWeight:700, margin:'0 0 14px' }}>
+          🏦 Projeção de reserva para 1 ano
+        </p>
+        <p style={{ color:'#6b7280', fontSize:11, margin:'0 0 6px' }}>
+          Fórmula: VF(0%; 12 meses; −(reserva atual + poupança mensal))
+        </p>
+        {[
+          ['Reserva atual (investimentos concluídos)', fmt(reservaAtual), '#818cf8'],
+          ['Poupança mensal (receitas − gastos)',      fmt(poupanca),    '#10b981'],
+          ['Projeção em 12 meses',                    fmt(projecao1Ano), '#60a5fa'],
+        ].map(([l,v,c]) => (
+          <div key={l} style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
+            <span style={{ color:'#8892a4', fontSize:13 }}>{l}</span>
+            <span style={{ color:c, fontSize:13, fontWeight:700 }}>{v}</span>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
@@ -436,12 +509,9 @@ function TelaPagarReceber({ data, setData }) {
 
   const cor = aba === 'pagar' ? '#ef4444' : '#10b981'
   const lista = data.pagarReceber[aba] || []
-
-  // ✅ Calculados automaticamente
   const total    = calcTotalContas(lista)
-  const pendente = calcTotalPorStatus(lista, aba==='pagar' ? 'Pendente' : 'Pendente')
-  const quitado  = calcTotalPorStatus(lista, aba==='pagar' ? 'Pago' : 'Recebido')
-
+  const pendente = calcTotalPorStatus(lista, 'Pendente')
+  const quitado  = calcTotalPorStatus(lista, aba === 'pagar' ? 'Pago' : 'Recebido')
   const statusColor = s => s==='Pago'||s==='Recebido' ? '#10b981' : s==='Pendente' ? '#f59e0b' : '#6b7280'
 
   const abrirAdd  = () => { setForm({ nome:'', valor:'', motivo:'', status:'Pendente' }); setModal('add') }
@@ -450,9 +520,9 @@ function TelaPagarReceber({ data, setData }) {
   const salvar = () => {
     if (!form.nome) return
     const u = { ...data }
-    const novo = { ...form, valor:parseBRL(form.valor) }
-    if (modal==='add') u.pagarReceber[aba] = [...lista, novo]
-    else { const arr=[...lista]; arr[modal]=novo; u.pagarReceber[aba]=arr }
+    const novo = { ...form, valor: parseBRL(form.valor) }
+    if (modal === 'add') u.pagarReceber[aba] = [...lista, novo]
+    else { const arr = [...lista]; arr[modal] = novo; u.pagarReceber[aba] = arr }
     setData(u); setModal(null)
   }
 
@@ -469,12 +539,11 @@ function TelaPagarReceber({ data, setData }) {
           <button key={a} onClick={() => setAba(a)} style={{
             flex:1, background: aba===a ? (a==='pagar'?'#ef4444':'#10b981') : '#1a1f2e',
             border:'none', borderRadius:12, color: aba===a?'#fff':'#8892a4',
-            padding:12, fontSize:14, fontWeight:700, cursor:'pointer'
+            padding:12, fontSize:14, fontWeight:700, cursor:'pointer',
           }}>{a==='pagar' ? '💸 A Pagar' : '💰 A Receber'}</button>
         ))}
       </div>
 
-      {/* Totais automáticos */}
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10, marginBottom:16 }}>
         {[['Total',total,cor],['Pendente',pendente,'#f59e0b'],['Quitado',quitado,'#10b981']].map(([l,v,c]) => (
           <div key={l} style={{ ...G.card, margin:0, padding:'12px 14px', border:`1px solid ${c}25` }}>
@@ -485,7 +554,7 @@ function TelaPagarReceber({ data, setData }) {
       </div>
 
       {lista.length === 0
-        ? <p style={{ color:'#4b5563', textAlign:'center', padding:'36px 0' }}>Nenhum item</p>
+        ? <Vazio msg="Toque no + para adicionar um item" />
         : lista.map((item, i) => (
           <div key={i} style={G.card}>
             <div style={{ display:'flex', justifyContent:'space-between', marginBottom:6 }}>
@@ -510,11 +579,10 @@ function TelaPagarReceber({ data, setData }) {
 
       {modal !== null && (
         <Sheet title={modal==='add'?(aba==='pagar'?'A Pagar':'A Receber'):'Editar'} onClose={() => setModal(null)}>
-          <Field label="Nome" value={form.nome} onChange={e => setForm({ ...form, nome:e.target.value })} />
-          <Field label="Valor (R$)" value={form.valor} onChange={e => setForm({ ...form, valor:e.target.value })} />
-          <Field label="Motivo" value={form.motivo} onChange={e => setForm({ ...form, motivo:e.target.value })} />
-          <Sel label="Status" value={form.status}
-            onChange={e => setForm({ ...form, status:e.target.value })}
+          <Field label="Nome" value={form.nome} onChange={e => setForm({ ...form, nome:e.target.value })} placeholder="Ex: João, Conta de luz..." />
+          <Field label="Valor (R$)" value={form.valor} onChange={e => setForm({ ...form, valor:e.target.value })} placeholder="0,00" />
+          <Field label="Motivo" value={form.motivo} onChange={e => setForm({ ...form, motivo:e.target.value })} placeholder="Ex: Aluguel, Empréstimo..." />
+          <Sel label="Status" value={form.status} onChange={e => setForm({ ...form, status:e.target.value })}
             options={['Pendente', aba==='pagar'?'Pago':'Recebido', 'Cancelado']} />
           <button onClick={salvar} style={G.btn(cor)}>{modal==='add'?'Adicionar':'Salvar'}</button>
         </Sheet>
@@ -528,25 +596,23 @@ function TelaInvestimentos({ data, setData }) {
   const [modal, setModal] = useState(null)
   const [form, setForm] = useState({ tipo:'', valor:'', status:'Pendente' })
 
-  const lista = data.investimentos
-
-  // ✅ Calculados automaticamente
-  const total      = calcTotalInvestimentos(lista)
-  const concluido  = calcInvestimentosConcluidos(lista)
-  const pendente   = total - concluido
+  const lista     = data.investimentos
+  const total     = calcTotalInvestimentos(lista)
+  const concluido = calcInvestimentosConcluidos(lista)
+  const pendente  = total - concluido
 
   const abrirAdd  = () => { setForm({ tipo:'', valor:'', status:'Pendente' }); setModal('add') }
   const abrirEdit = (i) => { setForm({ ...lista[i], valor:String(lista[i].valor) }); setModal(i) }
 
   const salvar = () => {
     if (!form.tipo) return
-    const novo = { ...form, valor:parseBRL(form.valor) }
-    if (modal==='add') setData({ ...data, investimentos:[...lista, novo] })
+    const novo = { ...form, valor: parseBRL(form.valor) }
+    if (modal === 'add') setData({ ...data, investimentos:[...lista, novo] })
     else { const arr=[...lista]; arr[modal]=novo; setData({ ...data, investimentos:arr }) }
     setModal(null)
   }
 
-  const remover = (i) => setData({ ...data, investimentos:lista.filter((_,idx) => idx !== i) })
+  const remover = (i) => setData({ ...data, investimentos: lista.filter((_,idx) => idx !== i) })
 
   return (
     <div style={{ padding:'0 16px 16px' }}>
@@ -559,30 +625,32 @@ function TelaInvestimentos({ data, setData }) {
         ))}
       </div>
 
-      {lista.map((item, i) => (
-        <div key={i} style={G.card}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
-            <div style={{ flex:1 }}>
-              <p style={{ color:'#cdd5e0', fontSize:14, fontWeight:600, margin:'0 0 8px' }}>{item.tipo}</p>
-              <Tag color={item.status==='Concluído' ? '#10b981' : '#f59e0b'}>{item.status}</Tag>
-            </div>
-            <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-              <span style={{ color:'#818cf8', fontSize:17, fontWeight:700 }}>{fmt(item.valor)}</span>
-              <button onClick={() => abrirEdit(i)} style={{ background:'none', border:'none', cursor:'pointer', color:'#8892a4', display:'flex' }}><Ico.Edit /></button>
-              <button onClick={() => remover(i)} style={{ background:'none', border:'none', cursor:'pointer', color:'#4b5563', display:'flex' }}><Ico.Trash /></button>
+      {lista.length === 0
+        ? <Vazio msg="Adicione reservas e metas de investimento" />
+        : lista.map((item, i) => (
+          <div key={i} style={G.card}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+              <div style={{ flex:1 }}>
+                <p style={{ color:'#cdd5e0', fontSize:14, fontWeight:600, margin:'0 0 8px' }}>{item.tipo}</p>
+                <Tag color={item.status==='Concluído' ? '#10b981' : '#f59e0b'}>{item.status}</Tag>
+              </div>
+              <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                <span style={{ color:'#818cf8', fontSize:17, fontWeight:700 }}>{fmt(item.valor)}</span>
+                <button onClick={() => abrirEdit(i)} style={{ background:'none', border:'none', cursor:'pointer', color:'#8892a4', display:'flex' }}><Ico.Edit /></button>
+                <button onClick={() => remover(i)} style={{ background:'none', border:'none', cursor:'pointer', color:'#4b5563', display:'flex' }}><Ico.Trash /></button>
+              </div>
             </div>
           </div>
-        </div>
-      ))}
+        ))
+      }
 
       <FAB color="#8b5cf6" onClick={abrirAdd} />
 
       {modal !== null && (
         <Sheet title={modal==='add'?'Novo investimento':'Editar'} onClose={() => setModal(null)}>
-          <Field label="Tipo / Descrição" value={form.tipo} onChange={e => setForm({ ...form, tipo:e.target.value })} />
-          <Field label="Valor (R$)" value={form.valor} onChange={e => setForm({ ...form, valor:e.target.value })} />
-          <Sel label="Status" value={form.status}
-            onChange={e => setForm({ ...form, status:e.target.value })}
+          <Field label="Tipo / Descrição" value={form.tipo} onChange={e => setForm({ ...form, tipo:e.target.value })} placeholder="Ex: Reserva de emergência, CDB..." />
+          <Field label="Valor separado (R$)" value={form.valor} onChange={e => setForm({ ...form, valor:e.target.value })} placeholder="0,00" />
+          <Sel label="Status" value={form.status} onChange={e => setForm({ ...form, status:e.target.value })}
             options={['Pendente','Concluído']} />
           <button onClick={salvar} style={G.btn('#8b5cf6')}>{modal==='add'?'Adicionar':'Salvar'}</button>
         </Sheet>
@@ -594,11 +662,9 @@ function TelaInvestimentos({ data, setData }) {
 // ─── Tela Projeções ───────────────────────────────────────────────────────────
 function TelaProjecoes({ data, setData }) {
   const [modal, setModal] = useState(null)
-  const [form, setForm] = useState({ nome:'', valor:'' })
+  const [form, setForm]   = useState({ nome:'', valor:'' })
 
-  const receitas = data.projecoes.receitas
-
-  // ✅ Todos calculados automaticamente
+  const receitas      = data.projecoes.receitas
   const totalReceitas = calcTotalReceitas(receitas)
   const totalGastos   = calcTotalGastos(data.lancamentos)
   const saldo         = calcDisponivel(totalReceitas, totalGastos)
@@ -609,8 +675,8 @@ function TelaProjecoes({ data, setData }) {
   const salvar = () => {
     if (!form.nome) return
     const u = { ...data }
-    const novo = { nome:form.nome, valor:parseBRL(form.valor) }
-    if (modal==='add') u.projecoes.receitas = [...receitas, novo]
+    const novo = { nome: form.nome, valor: parseBRL(form.valor) }
+    if (modal === 'add') u.projecoes.receitas = [...receitas, novo]
     else { const arr=[...receitas]; arr[modal]=novo; u.projecoes.receitas=arr }
     setData(u); setModal(null)
   }
@@ -623,7 +689,7 @@ function TelaProjecoes({ data, setData }) {
 
   return (
     <div style={{ padding:'0 16px 16px' }}>
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:18 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:14 }}>
         {[['Receitas',totalReceitas,'#10b981'],['Saídas',totalGastos,'#ef4444']].map(([l,v,c]) => (
           <div key={l} style={{ ...G.card, margin:0, border:`1px solid ${c}30` }}>
             <p style={{ color:'#8892a4', fontSize:11, textTransform:'uppercase', margin:'0 0 4px' }}>{l}</p>
@@ -632,29 +698,39 @@ function TelaProjecoes({ data, setData }) {
         ))}
       </div>
 
-      <div style={{ ...G.card, border:`1px solid ${saldo>=0?'#10b98130':'#ef444430'}` }}>
+      <div style={{ ...G.card, border:`1px solid ${saldo >= 0 ? '#10b98130' : '#ef444430'}` }}>
         <p style={{ color:'#8892a4', fontSize:11, textTransform:'uppercase', margin:'0 0 4px' }}>
           Saldo (receitas − saídas)
         </p>
-        <p style={{ color:saldo>=0?'#10b981':'#ef4444', fontSize:30, fontWeight:700, margin:0 }}>
+        <p style={{ color:saldo >= 0 ? '#10b981' : '#ef4444', fontSize:30, fontWeight:700, margin:0 }}>
           {fmt(saldo)}
+        </p>
+        <p style={{ color:'#4b5563', fontSize:11, margin:'4px 0 0' }}>
+          Este valor alimenta automaticamente a Saúde Financeira e o Resumo
         </p>
       </div>
 
-      <p style={{ color:'#8892a4', fontSize:12, textTransform:'uppercase', letterSpacing:1, margin:'4px 0 12px' }}>
-        Receitas cadastradas
-      </p>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', margin:'4px 0 12px' }}>
+        <p style={{ color:'#8892a4', fontSize:12, textTransform:'uppercase', letterSpacing:1, margin:0 }}>
+          Receitas cadastradas
+        </p>
+      </div>
 
-      {receitas.map((r, i) => (
-        <div key={i} style={{ ...G.card, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-          <span style={{ color:'#cdd5e0', fontSize:14 }}>{r.nome}</span>
-          <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-            <span style={{ color:r.valor===0?'#4b5563':'#10b981', fontSize:14, fontWeight:700 }}>{fmt(r.valor)}</span>
-            <button onClick={() => abrirEdit(i)} style={{ background:'none', border:'none', cursor:'pointer', color:'#8892a4', display:'flex' }}><Ico.Edit /></button>
-            <button onClick={() => remover(i)} style={{ background:'none', border:'none', cursor:'pointer', color:'#4b5563', display:'flex' }}><Ico.Trash /></button>
+      {receitas.length === 0
+        ? <Vazio msg="Adicione seu salário e outras receitas aqui" />
+        : receitas.map((r, i) => (
+          <div key={i} style={{ ...G.card, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+            <span style={{ color:'#cdd5e0', fontSize:14 }}>{r.nome}</span>
+            <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+              <span style={{ color:r.valor===0 ? '#4b5563' : '#10b981', fontSize:14, fontWeight:700 }}>
+                {fmt(r.valor)}
+              </span>
+              <button onClick={() => abrirEdit(i)} style={{ background:'none', border:'none', cursor:'pointer', color:'#8892a4', display:'flex' }}><Ico.Edit /></button>
+              <button onClick={() => remover(i)} style={{ background:'none', border:'none', cursor:'pointer', color:'#4b5563', display:'flex' }}><Ico.Trash /></button>
+            </div>
           </div>
-        </div>
-      ))}
+        ))
+      }
 
       <div style={{ background:'#1c1500', borderRadius:12, padding:'12px 16px',
                     border:'1px solid #f59e0b30', marginTop:4 }}>
@@ -667,8 +743,8 @@ function TelaProjecoes({ data, setData }) {
 
       {modal !== null && (
         <Sheet title={modal==='add'?'Nova receita':'Editar receita'} onClose={() => setModal(null)}>
-          <Field label="Nome" value={form.nome} onChange={e => setForm({ ...form, nome:e.target.value })} />
-          <Field label="Valor (R$)" value={form.valor} onChange={e => setForm({ ...form, valor:e.target.value })} />
+          <Field label="Nome" value={form.nome} onChange={e => setForm({ ...form, nome:e.target.value })} placeholder="Ex: Salário, Freelance, Vale transporte..." />
+          <Field label="Valor (R$)" value={form.valor} onChange={e => setForm({ ...form, valor:e.target.value })} placeholder="0,00" />
           <button onClick={salvar} style={G.btn('#10b981')}>{modal==='add'?'Adicionar':'Salvar'}</button>
         </Sheet>
       )}
@@ -688,14 +764,14 @@ const TABS = [
 
 export default function App() {
   const [tab, setTab] = useState('resumo')
-  const [data, setData] = useLocalStorage('fire_finance_v2', INITIAL)
+  const [data, setData] = useLocalStorage('fire_finance_v3', INITIAL)
   const [menuBackup, setMenuBackup] = useState(false)
 
   const exportar = () => {
     const blob = new Blob([JSON.stringify(data, null, 2)], { type:'application/json' })
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob)
-    a.download = `fire_finance_backup_${new Date().toISOString().slice(0,10)}.json`
+    a.download = `fire_finance_${new Date().toISOString().slice(0,10)}.json`
     a.click()
   }
 
@@ -706,10 +782,11 @@ export default function App() {
       try { setData(JSON.parse(ev.target.result)); setMenuBackup(false) } catch {}
     }
     r.readAsText(file)
+    e.target.value = ''
   }
 
   const resetar = () => {
-    if (window.confirm('Tem certeza? Todos os dados serão apagados.')) {
+    if (window.confirm('Apagar todos os dados e começar do zero?')) {
       setData(INITIAL); setMenuBackup(false)
     }
   }
@@ -731,7 +808,7 @@ export default function App() {
         *{box-sizing:border-box}
         ::-webkit-scrollbar{display:none}
         @keyframes slideUp{from{transform:translateY(100%);opacity:0}to{transform:translateY(0);opacity:1}}
-        input::placeholder{color:#4b5563}
+        input::placeholder,textarea::placeholder{color:#4b5563}
         select option{background:#1a1f2e}
         input[type=file]{display:none}
       `}</style>
@@ -745,12 +822,14 @@ export default function App() {
               Fire Finance
             </p>
             <h1 style={{ color:'#fff', fontSize:22, fontWeight:700, margin:0 }}>
-              {TABS.find(t => t.id===tab)?.label}
+              {TABS.find(t => t.id === tab)?.label}
             </h1>
           </div>
           <button onClick={() => setMenuBackup(true)}
-            style={{ background:'#10b981', borderRadius:'50%', width:38, height:38, border:'none', display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontWeight:700, fontSize:15, cursor:'pointer' }}>
-            R
+            style={{ background:'#252b3b', border:'1px solid #2a3048', borderRadius:10, width:38, height:38,
+                     display:'flex', alignItems:'center', justifyContent:'center',
+                     color:'#8892a4', cursor:'pointer' }}>
+            <Ico.Settings />
           </button>
         </div>
       </div>
@@ -771,20 +850,20 @@ export default function App() {
             <button key={t.id} onClick={() => setTab(t.id)} style={{
               flex:1, background:'none', border:'none', cursor:'pointer',
               display:'flex', flexDirection:'column', alignItems:'center', gap:4,
-              color: active ? '#10b981' : '#4b5563', padding:'6px 0'
+              color: active ? '#10b981' : '#4b5563', padding:'6px 0',
             }}>
               <t.icon />
-              <span style={{ fontSize:9, fontWeight: active?700:400 }}>{t.label}</span>
+              <span style={{ fontSize:9, fontWeight: active ? 700 : 400 }}>{t.label}</span>
             </button>
           )
         })}
       </nav>
 
-      {/* Menu backup */}
+      {/* Menu backup/config */}
       {menuBackup && (
-        <Sheet title="Dados & Backup" onClose={() => setMenuBackup(false)}>
+        <Sheet title="⚙️ Configurações" onClose={() => setMenuBackup(false)}>
           <p style={{ color:'#8892a4', fontSize:13, margin:'0 0 20px', lineHeight:1.6 }}>
-            Dados salvos automaticamente no navegador. Exporte para não perder ao trocar de dispositivo.
+            Seus dados ficam salvos automaticamente no navegador. Exporte para não perder ao trocar de dispositivo.
           </p>
           <button onClick={exportar} style={{ ...G.btn('#3b82f6'), display:'flex',
             alignItems:'center', justifyContent:'center', gap:8, marginBottom:12 }}>
@@ -796,7 +875,7 @@ export default function App() {
             <Ico.Up /> Importar backup (.json)
           </label>
           <input id="importFile" type="file" accept=".json" onChange={importar} />
-          <button onClick={resetar} style={G.btn('#ef4444')}>🗑️ Resetar todos os dados</button>
+          <button onClick={resetar} style={G.btn('#ef4444')}>🗑️ Apagar todos os dados</button>
         </Sheet>
       )}
     </div>
